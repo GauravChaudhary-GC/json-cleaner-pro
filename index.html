@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JSON Cleaner Pro — Fix broken JSON instantly</title>
+<meta name="description" content="Paste your broken JSON. Get clean, readable output in one click. Fixes escaped quotes, missing brackets, double-encoded values, and more. Free, offline, no login.">
+<meta property="og:title" content="JSON Cleaner Pro">
+<meta property="og:description" content="Fix broken JSON from APIs and data pipelines instantly. Free browser tool + Chrome Extension.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0f14;
+    --surface: #13161e;
+    --surface2: #1a1e2a;
+    --border: #252a38;
+    --accent: #00e5a0;
+    --accent2: #00b8ff;
+    --danger: #ff4f6a;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --key: #00e5a0;
+    --string: #7dd3fc;
+    --number: #a78bfa;
+    --bool: #f97316;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* ── Grid pattern background ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,160,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,160,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Nav ── */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
+    padding: 16px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(13,15,20,0.85);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid rgba(37,42,56,0.8);
+  }
+
+  .nav-logo {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-decoration: none;
+  }
+
+  .nav-links { display: flex; align-items: center; gap: 32px; }
+
+  .nav-links a {
+    font-size: 13px;
+    color: var(--muted);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+  .nav-links a:hover { color: var(--text); }
+
+  .nav-cta {
+    background: var(--accent) !important;
+    color: #000 !important;
+    padding: 7px 18px;
+    border-radius: 8px;
+    font-weight: 500;
+    font-size: 13px;
+    transition: opacity 0.15s !important;
+  }
+  .nav-cta:hover { opacity: 0.88; }
+
+  /* ── Hero ── */
+  .hero {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 120px 40px 80px;
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+    color: var(--accent);
+    background: rgba(0,229,160,0.08);
+    border: 1px solid rgba(0,229,160,0.2);
+    padding: 5px 14px;
+    border-radius: 20px;
+    margin-bottom: 28px;
+    animation: fadeUp 0.6s ease both;
+  }
+
+  .hero-badge-dot {
+    width: 6px; height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: pulse 2s ease infinite;
+  }
+
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .hero h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(40px, 6vw, 72px);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    margin-bottom: 24px;
+    animation: fadeUp 0.6s 0.1s ease both;
+  }
+
+  .hero h1 .accent {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero-sub {
+    font-size: clamp(16px, 2vw, 20px);
+    color: var(--muted);
+    max-width: 540px;
+    margin-bottom: 40px;
+    animation: fadeUp 0.6s 0.2s ease both;
+  }
+
+  .hero-actions {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    justify-content: center;
+    animation: fadeUp 0.6s 0.3s ease both;
+  }
+
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #000;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    padding: 14px 32px;
+    border-radius: 10px;
+    text-decoration: none;
+    transition: opacity 0.15s, transform 0.15s;
+  }
+  .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface2);
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 500;
+    padding: 13px 24px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    text-decoration: none;
+    transition: border-color 0.15s, transform 0.15s;
+  }
+  .btn-secondary:hover { border-color: #3a4055; transform: translateY(-1px); }
+
+  .hero-note {
+    margin-top: 16px;
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    animation: fadeUp 0.6s 0.4s ease both;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Before / After demo ── */
+  .demo-section {
+    position: relative;
+    z-index: 1;
+    padding: 0 40px 100px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .demo-grid {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 0;
+    align-items: stretch;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .demo-pane {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .demo-pane-header {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255,255,255,0.02);
+  }
+
+  .demo-pane-title {
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    font-weight: 500;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .demo-pill-dirty {
+    font-size: 9px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-family: 'DM Mono', monospace;
+    background: #2a1a1e;
+    color: var(--danger);
+    border: 1px solid rgba(255,79,106,0.2);
+  }
+
+  .demo-pill-clean {
+    font-size: 9px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-family: 'DM Mono', monospace;
+    background: #0d2a1e;
+    color: var(--accent);
+    border: 1px solid rgba(0,229,160,0.2);
+  }
+
+  .demo-code {
+    padding: 24px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12.5px;
+    line-height: 1.8;
+    flex: 1;
+    overflow-x: auto;
+    white-space: pre;
+    color: var(--muted);
+  }
+
+  .demo-code .dirty { color: #e2e8f0; }
+  .demo-code .j-key { color: var(--key); }
+  .demo-code .j-str { color: var(--string); }
+  .demo-code .j-num { color: var(--number); }
+  .demo-code .j-punc { color: #64748b; }
+
+  .demo-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 24px;
+    flex-shrink: 0;
+  }
+
+  .arrow-icon {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: #000;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .demo-fix-bar {
+    padding: 10px 20px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0,229,160,0.03);
+  }
+
+  .demo-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+
+  .demo-tab {
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+    padding: 5px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--surface2);
+    color: var(--muted);
+    transition: all 0.15s;
+  }
+  .demo-tab.active {
+    background: rgba(0,229,160,0.1);
+    border-color: rgba(0,229,160,0.3);
+    color: var(--accent);
+  }
+
+  .section-label {
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  /* ── Features ── */
+  .features-section {
+    position: relative;
+    z-index: 1;
+    padding: 0 40px 100px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .features-header {
+    text-align: center;
+    margin-bottom: 60px;
+  }
+
+  .features-header h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(28px, 4vw, 44px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 12px;
+  }
+
+  .features-header p {
+    color: var(--muted);
+    font-size: 16px;
+    max-width: 460px;
+    margin: 0 auto;
+  }
+
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+
+  .feature-card {
+    background: var(--surface);
+    padding: 32px 28px;
+    transition: background 0.2s;
+  }
+  .feature-card:hover { background: var(--surface2); }
+
+  .feature-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    margin-bottom: 16px;
+  }
+  .icon-teal { background: rgba(0,229,160,0.1); }
+  .icon-blue { background: rgba(0,184,255,0.1); }
+  .icon-purple { background: rgba(167,139,250,0.1); }
+
+  .feature-card h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .feature-card p {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  /* ── Patterns ── */
+  .patterns-section {
+    position: relative;
+    z-index: 1;
+    padding: 0 40px 100px;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .patterns-header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+
+  .patterns-header h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(28px, 4vw, 44px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 12px;
+  }
+
+  .patterns-header p { color: var(--muted); font-size: 16px; }
+
+  .patterns-list { display: flex; flex-direction: column; gap: 12px; }
+
+  .pattern-row {
+    display: grid;
+    grid-template-columns: 1fr 40px 1fr;
+    gap: 0;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    align-items: stretch;
+  }
+
+  .pattern-cell {
+    padding: 16px 20px;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+  }
+
+  .pattern-cell.dirty { color: var(--danger); border-right: 1px solid var(--border); }
+  .pattern-cell.clean { color: var(--accent); }
+  .pattern-mid {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-size: 14px;
+    border-right: 1px solid var(--border);
+    background: rgba(255,255,255,0.02);
+  }
+
+  .pattern-label {
+    font-size: 10px;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 4px;
+  }
+
+  /* ── CTA section ── */
+  .cta-section {
+    position: relative;
+    z-index: 1;
+    padding: 0 40px 120px;
+    max-width: 700px;
+    margin: 0 auto;
+    text-align: center;
+  }
+
+  .cta-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 60px 48px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cta-box::before {
+    content: '';
+    position: absolute;
+    top: -60px; left: 50%;
+    transform: translateX(-50%);
+    width: 300px;
+    height: 300px;
+    background: radial-gradient(circle, rgba(0,229,160,0.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .cta-box h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(28px, 4vw, 40px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 16px;
+  }
+
+  .cta-box p {
+    color: var(--muted);
+    font-size: 16px;
+    margin-bottom: 36px;
+    line-height: 1.7;
+  }
+
+  .cta-actions {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+
+  .cta-note {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* ── Footer ── */
+  footer {
+    position: relative;
+    z-index: 1;
+    border-top: 1px solid var(--border);
+    padding: 32px 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .footer-logo {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-decoration: none;
+  }
+
+  .footer-links {
+    display: flex;
+    gap: 24px;
+  }
+
+  .footer-links a {
+    font-size: 12px;
+    color: var(--muted);
+    text-decoration: none;
+    transition: color 0.15s;
+  }
+  .footer-links a:hover { color: var(--text); }
+
+  .footer-credit {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    nav { padding: 14px 20px; }
+    .nav-links a:not(.nav-cta) { display: none; }
+    .hero { padding: 100px 20px 60px; }
+    .demo-section, .features-section, .patterns-section, .cta-section { padding-left: 20px; padding-right: 20px; }
+    .demo-grid { grid-template-columns: 1fr; }
+    .demo-arrow { padding: 16px; transform: rotate(90deg); }
+    .features-grid { grid-template-columns: 1fr; }
+    .pattern-row { grid-template-columns: 1fr; }
+    .pattern-mid { display: none; }
+    .pattern-cell.dirty { border-right: none; border-bottom: 1px solid var(--border); }
+    .cta-box { padding: 40px 24px; }
+    footer { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav>
+  <a class="nav-logo" href="/">JSON Cleaner Pro</a>
+  <div class="nav-links">
+    <a href="#patterns">What it fixes</a>
+    <a href="#features">Features</a>
+    <a href="privacy.html">Privacy</a>
+    <a href="app.html" class="nav-cta">Try it free →</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-badge">
+    <div class="hero-badge-dot"></div>
+    Free &amp; open · No login · Works offline
+  </div>
+  <h1>Fix broken JSON<br><span class="accent">instantly.</span></h1>
+  <p class="hero-sub">Paste the malformed JSON your APIs, pipelines, and databases produce. Get clean, readable output in one click.</p>
+  <div class="hero-actions">
+    <a href="app.html" class="btn-primary">⚡ Try it free in your browser</a>
+    <a href="https://chrome.google.com/webstore" class="btn-secondary" target="_blank" rel="noopener">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7.5" stroke="currentColor" stroke-opacity="0.4"/><circle cx="8" cy="8" r="3" fill="currentColor"/></svg>
+      Chrome Extension
+    </a>
+  </div>
+  <p class="hero-note">No account · No data leaves your browser · Works in every browser</p>
+</section>
+
+<!-- Before / After Demo -->
+<section class="demo-section">
+  <div class="section-label" style="text-align:center;margin-bottom:20px;">Live example</div>
+  <div class="demo-tabs" style="justify-content:center;margin-bottom:24px;" id="demoTabs">
+    <div class="demo-tab active" data-demo="0">Double-encoded</div>
+    <div class="demo-tab" data-demo="1">Missing brackets</div>
+    <div class="demo-tab" data-demo="2">Stringified value</div>
+    <div class="demo-tab" data-demo="3">Trailing commas</div>
+  </div>
+
+  <div class="demo-grid" id="demoGrid">
+    <div class="demo-pane">
+      <div class="demo-pane-header">
+        <span class="demo-pane-title">Input</span>
+        <span class="demo-pill-dirty">broken</span>
+      </div>
+      <div class="demo-code" id="demoIn"></div>
+    </div>
+    <div class="demo-arrow">
+      <div class="arrow-icon">→</div>
+    </div>
+    <div class="demo-pane">
+      <div class="demo-pane-header">
+        <span class="demo-pane-title">Output</span>
+        <span class="demo-pill-clean">fixed</span>
+      </div>
+      <div class="demo-code" id="demoOut"></div>
+      <div class="demo-fix-bar" id="demoFix"></div>
+    </div>
+  </div>
+</section>
+
+<!-- Patterns -->
+<section class="patterns-section" id="patterns">
+  <div class="patterns-header">
+    <div class="section-label">What it fixes</div>
+    <h2>Every broken pattern,<br>handled automatically</h2>
+    <p style="color:var(--muted);font-size:16px;margin-top:12px;">Real examples from real data pipelines.</p>
+  </div>
+
+  <div class="patterns-list">
+    <div class="pattern-row">
+      <div class="pattern-cell dirty"><div class="pattern-label">Input</div>"""bot_src"": { ""screen_name"": ""home"" }</div>
+      <div class="pattern-mid">→</div>
+      <div class="pattern-cell clean"><div class="pattern-label">Output</div>{"bot_src": {"screen_name": "home"}}</div>
+    </div>
+    <div class="pattern-row">
+      <div class="pattern-cell dirty"><div class="pattern-label">Input</div>{"extraInfo":"{\"ts\":1234,\"id\":\"abc\"}"}</div>
+      <div class="pattern-mid">→</div>
+      <div class="pattern-cell clean"><div class="pattern-label">Output</div>{"extraInfo": {"ts": 1234, "id": "abc"}}</div>
+    </div>
+    <div class="pattern-row">
+      <div class="pattern-cell dirty"><div class="pattern-label">Input</div>{"entities": "[{\"name\":\"Alice\"}]",<br>"sec": "picks"}</div>
+      <div class="pattern-mid">→</div>
+      <div class="pattern-cell clean"><div class="pattern-label">Output</div>{"entities": [{"name": "Alice"}],<br>"sec": "picks"}</div>
+    </div>
+    <div class="pattern-row">
+      <div class="pattern-cell dirty"><div class="pattern-label">Input</div>{"name": "Alice", "tags": [1, 2, 3}</div>
+      <div class="pattern-mid">→</div>
+      <div class="pattern-cell clean"><div class="pattern-label">Output</div>{"name": "Alice", "tags": [1, 2, 3]}</div>
+    </div>
+    <div class="pattern-row">
+      <div class="pattern-cell dirty"><div class="pattern-label">Input</div>{"name": "Alice",}</div>
+      <div class="pattern-mid">→</div>
+      <div class="pattern-cell clean"><div class="pattern-label">Output</div>{"name": "Alice"}</div>
+    </div>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="features-section" id="features">
+  <div class="features-header">
+    <div class="section-label">Features</div>
+    <h2>Everything you need.<br>Nothing you don't.</h2>
+    <p>Built by a data PM who gets broken JSON every day.</p>
+  </div>
+
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon icon-teal">⚡</div>
+      <h3>21 patterns fixed automatically</h3>
+      <p>Escaped quotes, double-double-quoted keys, missing brackets, stringified values, trailing commas — and combinations of all of them.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon icon-blue">🎨</div>
+      <h3>Syntax-highlighted output</h3>
+      <p>Keys, strings, numbers, booleans — each colour-coded. Stats bar shows key count, depth, size, and exactly which fixes were applied.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon icon-purple">🔒</div>
+      <h3>100% offline &amp; private</h3>
+      <p>All processing happens in your browser. No data sent to any server. Works without internet. Safe for sensitive API responses.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon icon-teal">📋</div>
+      <h3>Copy in one click</h3>
+      <p>Copy formatted (pretty-printed) or minified JSON. Keyboard shortcut: ⌘+Enter / Ctrl+Enter to clean instantly.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon icon-blue">🕐</div>
+      <h3>Processing history</h3>
+      <p>Chrome Extension saves your last 10 cleans. One click to restore any previous input — no more re-pasting the same broken JSON.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon icon-purple">🌐</div>
+      <h3>Every browser, any OS</h3>
+      <p>The web app works in Chrome, Firefox, Safari, Edge — anywhere. The Chrome Extension adds keyboard shortcuts and history.</p>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="cta-box">
+    <h2>Stop debugging JSON manually.</h2>
+    <p>Paste it in. Get it clean. Get back to the work that matters.</p>
+    <div class="cta-actions">
+      <a href="app.html" class="btn-primary">⚡ Open the tool</a>
+      <a href="https://chrome.google.com/webstore" class="btn-secondary" target="_blank" rel="noopener">Get Chrome Extension</a>
+    </div>
+    <p class="cta-note">Free · No account · No data leaves your browser</p>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer>
+  <a class="footer-logo" href="/">JSON Cleaner Pro</a>
+  <div class="footer-links">
+    <a href="app.html">Tool</a>
+    <a href="privacy.html">Privacy</a>
+    <a href="https://github.com/YOUR_USERNAME/json-cleaner-pro" target="_blank" rel="noopener">GitHub</a>
+    <a href="mailto:?subject=JSON%20Cleaner%20Pro&body=Free%20tool%20that%20fixes%20broken%20JSON%20instantly%3A%20https%3A%2F%2FYOUR_USERNAME.github.io%2Fjson-cleaner-pro">✉ Get updates</a>
+  </div>
+  <span class="footer-credit">v2.5 · built for data teams</span>
+</footer>
+
+<script>
+const demos = [
+  {
+    tab: 'Double-encoded',
+    input: '"""bot_src"": {\n    ""screen_name"": ""home_screen_music"",\n    ""sec_pos"": ""1""\n}',
+    output: '{\n  <span class="j-key">"bot_src"</span><span class="j-punc">:</span> <span class="j-punc">{</span>\n    <span class="j-key">"screen_name"</span><span class="j-punc">:</span> <span class="j-str">"home_screen_music"</span><span class="j-punc">,</span>\n    <span class="j-key">"sec_pos"</span><span class="j-punc">:</span> <span class="j-str">"1"</span>\n  <span class="j-punc">}</span>\n<span class="j-punc">}</span>',
+    fix: '✓ Normalised double-double-quotes ("")'
+  },
+  {
+    tab: 'Missing brackets',
+    input: '{"name": "Alice", "tags": [1, 2, 3}',
+    output: '<span class="j-punc">{</span>\n  <span class="j-key">"name"</span><span class="j-punc">:</span> <span class="j-str">"Alice"</span><span class="j-punc">,</span>\n  <span class="j-key">"tags"</span><span class="j-punc">:</span> <span class="j-punc">[</span><span class="j-num">1</span><span class="j-punc">,</span> <span class="j-num">2</span><span class="j-punc">,</span> <span class="j-num">3</span><span class="j-punc">]</span>\n<span class="j-punc">}</span>',
+    fix: '✓ Inserted 1 missing ] before }'
+  },
+  {
+    tab: 'Stringified value',
+    input: '{"extraInfo":"{\\"ts\\":1234,\\"id\\":\\"abc\\"}"}',
+    output: '<span class="j-punc">{</span>\n  <span class="j-key">"extraInfo"</span><span class="j-punc">:</span> <span class="j-punc">{</span>\n    <span class="j-key">"ts"</span><span class="j-punc">:</span> <span class="j-num">1234</span><span class="j-punc">,</span>\n    <span class="j-key">"id"</span><span class="j-punc">:</span> <span class="j-str">"abc"</span>\n  <span class="j-punc">}</span>\n<span class="j-punc">}</span>',
+    fix: '✓ Expanded stringified nested JSON'
+  },
+  {
+    tab: 'Trailing commas',
+    input: '{\n  "name": "Alice",\n  "active": true,\n}',
+    output: '<span class="j-punc">{</span>\n  <span class="j-key">"name"</span><span class="j-punc">:</span> <span class="j-str">"Alice"</span><span class="j-punc">,</span>\n  <span class="j-key">"active"</span><span class="j-punc">:</span> <span class="j-bool">true</span>\n<span class="j-punc">}</span>',
+    fix: '✓ Removed trailing commas'
+  }
+];
+
+let currentDemo = 0;
+
+function setDemo(idx) {
+  currentDemo = idx;
+  document.querySelectorAll('.demo-tab').forEach((t, i) => t.classList.toggle('active', i === idx));
+  document.getElementById('demoIn').textContent = demos[idx].input;
+  document.getElementById('demoOut').innerHTML = demos[idx].output;
+  document.getElementById('demoFix').textContent = demos[idx].fix;
+}
+
+document.querySelectorAll('.demo-tab').forEach((tab, i) => {
+  tab.addEventListener('click', () => setDemo(i));
+});
+
+setDemo(0);
+
+// Auto-cycle demos every 4 seconds
+setInterval(() => setDemo((currentDemo + 1) % demos.length), 4000);
+</script>
+</body>
+</html>

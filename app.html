@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JSON Cleaner Pro</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+
+  :root {
+    --bg: #0d0f14;
+    --surface: #13161e;
+    --surface2: #1a1e2a;
+    --border: #252a38;
+    --accent: #00e5a0;
+    --accent2: #00b8ff;
+    --danger: #ff4f6a;
+    --warn: #ffa94d;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --string: #7dd3fc;
+    --number: #a78bfa;
+    --bool: #f97316;
+    --null: #fb7185;
+    --key: #00e5a0;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    padding: 20px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .logo-tag {
+    font-size: 11px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-family: 'DM Mono', monospace;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+  }
+
+  .options-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+    flex-wrap: wrap;
+  }
+
+  .opt-label {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .toggle-group {
+    display: flex;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .toggle-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .toggle-btn.active {
+    background: var(--accent);
+    color: #000;
+  }
+
+  .workspace {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    height: calc(100vh - 65px);
+  }
+
+  .pane {
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .pane:last-child { border-right: none; }
+
+  .pane-header {
+    padding: 12px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+
+  .pane-title {
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    font-weight: 500;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .pill {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-family: 'DM Mono', monospace;
+    font-weight: 500;
+  }
+
+  .pill-input { background: #1e2d4a; color: var(--accent2); border: 1px solid #2a4060; }
+  .pill-output { background: #0d2a1e; color: var(--accent); border: 1px solid #1a4030; }
+
+  .pane-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+    align-items: center;
+  }
+
+  .btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 7px;
+    font-size: 12px;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+  }
+
+  .btn-ghost {
+    background: var(--surface2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+
+  .btn-ghost:hover { color: var(--text); border-color: #3a4055; }
+
+  .btn-accent {
+    background: var(--accent);
+    color: #000;
+  }
+
+  .btn-accent:hover { background: #00ffb2; }
+
+  .btn-danger {
+    background: transparent;
+    color: var(--danger);
+    border: 1px solid rgba(255,79,106,0.3);
+  }
+
+  .btn-danger:hover { background: rgba(255,79,106,0.1); }
+
+  .icon { font-size: 13px; }
+
+  textarea {
+    flex: 1;
+    background: var(--bg);
+    color: var(--text);
+    border: none;
+    padding: 20px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    line-height: 1.75;
+    resize: none;
+    outline: none;
+    tab-size: 2;
+    overflow-y: auto;
+  }
+
+  textarea::placeholder { color: var(--muted); }
+
+  .output-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    line-height: 1.75;
+    background: var(--bg);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .status-bar {
+    padding: 10px 20px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-shrink: 0;
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  .stat { color: var(--muted); display: flex; align-items: center; gap: 5px; }
+  .stat span { color: var(--text); }
+
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .dot-ok { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .dot-err { background: var(--danger); box-shadow: 0 0 6px var(--danger); }
+  .dot-idle { background: var(--muted); }
+
+  .error-msg {
+    color: var(--danger);
+    background: rgba(255,79,106,0.08);
+    border: 1px solid rgba(255,79,106,0.2);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin: 20px;
+    font-size: 12px;
+    font-family: 'DM Mono', monospace;
+    line-height: 1.6;
+  }
+
+  /* Syntax highlighting */
+  .j-key    { color: var(--key); }
+  .j-str    { color: var(--string); }
+  .j-num    { color: var(--number); }
+  .j-bool   { color: var(--bool); }
+  .j-null   { color: var(--null); }
+  .j-punc   { color: #64748b; }
+  .j-brace  { color: #94a3b8; }
+
+  .copied-toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--accent);
+    color: #000;
+    font-weight: 600;
+    font-size: 13px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,229,160,0.4);
+    transform: translateY(60px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    pointer-events: none;
+    z-index: 999;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .copied-toast.show {
+    transform: translateY(0);
+    opacity: 1;
+  }
+
+  .process-btn-wrap {
+    padding: 14px 20px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .process-btn {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none;
+    color: #000;
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    transition: opacity 0.15s;
+  }
+
+  .process-btn:hover { opacity: 0.9; }
+
+  .empty-state {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 10px;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .empty-icon { font-size: 32px; opacity: 0.4; }
+</style>
+</head>
+
+
+<header>
+  <a href="index.html" style="font-size:11px;color:var(--muted);text-decoration:none;font-family:'DM Sans',sans-serif;margin-right:4px;transition:color 0.15s;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">← Home</a>
+  <div class="logo">JSON Cleaner Pro</div>
+  <div class="logo-tag">v2.5</div>
+
+  <div class="options-bar">
+    <span class="opt-label">Indent:</span>
+    <div class="toggle-group" id="indentGroup">
+      <button class="toggle-btn active" data-val="2">2</button>
+      <button class="toggle-btn" data-val="4">4</button>
+      <button class="toggle-btn" data-val="tab">Tab</button>
+    </div>
+    <span class="opt-label">Theme:</span>
+    <div class="toggle-group" id="themeGroup">
+      <button class="toggle-btn active" data-theme="dark">Dark</button>
+      <button class="toggle-btn" data-theme="light">Light</button>
+    </div>
+  </div>
+</header>
+
+<div class="workspace">
+  <!-- INPUT PANE -->
+  <div class="pane">
+    <div class="pane-header">
+      <span class="pane-title">Input</span>
+      <span class="pill pill-input">RAW / DIRTY JSON</span>
+      <div class="pane-actions">
+        <button class="btn btn-ghost" onclick="pasteClipboard()">⌘ Paste</button>
+        <button class="btn btn-danger" onclick="clearInput()">✕ Clear</button>
+      </div>
+    </div>
+    <textarea id="inputArea" placeholder='Paste your messy JSON here...
+
+Examples of what gets cleaned:
+• "{\"name\":\"Alice\",\"age\":30}"
+• Stringified / double-encoded JSON
+• Escaped unicode characters
+• Trailing commas
+• Extra backslashes'
+      oninput="autoProcess()"
+    ></textarea>
+    <div class="process-btn-wrap">
+      <button class="process-btn" onclick="process()">⚡ Clean &amp; Beautify JSON</button>
+    </div>
+  </div>
+
+  <!-- OUTPUT PANE -->
+  <div class="pane">
+    <div class="pane-header">
+      <span class="pane-title">Output</span>
+      <span class="pill pill-output">CLEAN / HUMAN READABLE</span>
+      <div class="pane-actions">
+        <button class="btn btn-ghost" id="copyRawBtn" onclick="copyRaw()" style="display:none">📋 Copy Raw</button>
+        <button class="btn btn-accent" id="copyBtn" onclick="copyOutput()" style="display:none">⬆ Copy</button>
+      </div>
+    </div>
+    <div class="output-area" id="outputArea">
+      <div class="empty-state">
+        <div class="empty-icon">✦</div>
+        <div>Your cleaned JSON will appear here</div>
+      </div>
+    </div>
+    <div class="status-bar" id="statusBar">
+      <div class="stat"><span class="status-dot dot-idle" id="statusDot"></span></div>
+      <div class="stat" id="keysCount" style="display:none">Keys <span id="keysVal">—</span></div>
+      <div class="stat" id="depthStat" style="display:none">Depth <span id="depthVal">—</span></div>
+      <div class="stat" id="sizeStat" style="display:none">Size <span id="sizeVal">—</span></div>
+      <div class="stat" id="msgStat">Ready</div>
+    </div>
+  </div>
+</div>
+
+<div class="copied-toast" id="toast">✓ Copied to clipboard!</div>
+
+<script>
+// JSON CLEANER PRO — Chrome Extension popup.js v2.5
+// expandStringifiedValues extended: handles all bracket-mismatch variants in stringified values:
+//   "{...}]"  — trailing ], wrap in array
+//   "[{...}"  — missing ], append ]
+//   "[{...\"val\"]" — missing } before ], insert }
+//   "[\"key\":...}]" — missing { after [, insert {
+
+let currentIndent = 2;
+let cleanedData = null;
+
+function expandStringifiedValues(obj) {
+  if (typeof obj === 'string') {
+    const t = obj.trim();
+
+    // 1. Perfect: valid JSON object or array
+    if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
+      try { return expandStringifiedValues(JSON.parse(t)); } catch(e) {}
+    }
+
+    // 2. "{...}]" — object with trailing ] is a single-element array hint
+    if (t.startsWith('{') && /\}\s*\]\s*$/.test(t)) {
+      const clean = t.replace(/\}\s*\]\s*$/, '}');
+      try { return [expandStringifiedValues(JSON.parse(clean))]; } catch(e) {}
+    }
+
+    // 3. "[{...}" — array+object missing closing ] -> append ]
+    if (t.startsWith('[') && t.endsWith('}')) {
+      try { return expandStringifiedValues(JSON.parse(t + ']')); } catch(e) {}
+    }
+
+    // 4. "[{...\"val\"]" — array+object missing closing } before ] -> insert } before ]
+    if (t.startsWith('[{') && t.endsWith(']') && !t.endsWith('}]')) {
+      try { return expandStringifiedValues(JSON.parse(t.slice(0, -1) + '}]')); } catch(e) {}
+    }
+
+    // 5. "[\"key\":...}]" or "[\"key\":...}" — array missing opening { for object -> insert { after [
+    if (t.startsWith('[') && !t.startsWith('[{') && (t.endsWith('}]') || t.endsWith('}'))) {
+      const fixed = '[{' + t.slice(1);
+      try { return expandStringifiedValues(JSON.parse(fixed)); } catch(e) {}
+      try { return expandStringifiedValues(JSON.parse(fixed + ']')); } catch(e) {}
+    }
+
+    // 6. "[..." with trailing garbage after last ] — trim and retry
+    if (t.startsWith('[')) {
+      const lastBracket = t.lastIndexOf(']');
+      if (lastBracket > 0 && lastBracket < t.length - 1) {
+        try { return expandStringifiedValues(JSON.parse(t.slice(0, lastBracket + 1))); } catch(e) {}
+      }
+    }
+
+    return obj;
+  }
+  if (Array.isArray(obj)) return obj.map(expandStringifiedValues);
+  if (obj !== null && typeof obj === 'object') {
+    const out = {};
+    for (const k of Object.keys(obj)) out[k] = expandStringifiedValues(obj[k]);
+    return out;
+  }
+  return obj;
+}
+
+function countUnclosed(s) {
+  let curly = 0, square = 0, inString = false, escape = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (escape) { escape = false; continue; }
+    if (c === '\\' && inString) { escape = true; continue; }
+    if (c === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (c === '{') curly++;
+    else if (c === '}') curly--;
+    else if (c === '[') square++;
+    else if (c === ']') square--;
+  }
+  return { curly, square };
+}
+
+function looksLikeFragment(s) {
+  return /^\s*"[^"]+"\s*:/.test(s);
+}
+
+function fixMissingArrayClose(s) {
+  const applied = [];
+  const fixed = s.replace(/\}\s*\n(\s*),(\s*\n\s*"[\w]+")/g, function(m, ws1, ws2) {
+    applied.push('Inserted missing ] to close array before sibling key');
+    return '}\n' + ws1 + '],' + ws2;
+  });
+  return { result: fixed, applied };
+}
+
+function fixUnclosedArrayItems(s) {
+  const applied = [];
+  let result = s;
+  const brackets = [];
+  for (let i = 0; i < s.length; i++) {
+    if (s[i] === '[') brackets.push(i);
+  }
+  let shift = 0;
+  for (const bracketPos of brackets) {
+    let depth = 0, inStr = false, esc = false, insertBefore = -1;
+    for (let i = bracketPos + shift + 1; i < result.length; i++) {
+      const c = result[i];
+      if (esc) { esc = false; continue; }
+      if (c === '\\' && inStr) { esc = true; continue; }
+      if (c === '"') { inStr = !inStr; continue; }
+      if (inStr) continue;
+      if (c === '{') depth++;
+      else if (c === '}') depth--;
+      else if (c === ']') { if (depth > 0) insertBefore = i; break; }
+    }
+    if (insertBefore >= 0) {
+      result = result.slice(0, insertBefore) + '}'.repeat(depth) + result.slice(insertBefore);
+      applied.push('Inserted ' + depth + ' missing } before ] in array');
+      shift += depth;
+    }
+  }
+  return { result, applied };
+}
+
+function fixMissingArrayOpen(s) {
+  const applied = [];
+  const fixed = s.replace(/\[\s*\n(\s*)("[\w]+")\s*:/g, function(m, ws, key) {
+    applied.push('Inserted missing { for array item starting with ' + key);
+    return '[\n' + ws + '{\n' + ws + key + ':';
+  });
+  return { result: fixed, applied };
+}
+
+function fixStructuralBrackets(s) {
+  const applied = [];
+  let result = s;
+
+  const keyColonBrace = /("[\w]+")\s*:\s*\n[ \t]*\{/g;
+  let m;
+  const insertions = [];
+  while ((m = keyColonBrace.exec(result)) !== null) {
+    const bracePos = m.index + m[0].lastIndexOf('{');
+    let depth = 0, inStr = false, esc = false, hitType = null, hitPos = -1;
+    for (let i = bracePos; i < result.length; i++) {
+      const c = result[i];
+      if (esc) { esc = false; continue; }
+      if (c === '\\' && inStr) { esc = true; continue; }
+      if (c === '"') { inStr = !inStr; continue; }
+      if (inStr) continue;
+      if (c === '{') depth++;
+      else if (c === '}') { depth--; if (depth === 0) break; }
+      else if (c === ']' && depth > 0) { hitType = 'bracket'; hitPos = i; break; }
+      else if (c === ',' && depth === 1) {
+        const after = result.slice(i + 1, i + 50);
+        if (/^\s*\n\s*"[\w]+"/.test(after)) { hitType = 'comma'; hitPos = i; break; }
+      }
+    }
+    if (hitType) insertions.push({ bracePos, hitPos, hitType, keyName: m[1] });
+  }
+
+  let shift = 0;
+  for (const { bracePos, hitPos, hitType, keyName } of insertions) {
+    if (hitType === 'bracket') {
+      result = result.slice(0, bracePos + shift) + '[' + result.slice(bracePos + shift); shift++;
+      result = result.slice(0, hitPos + shift) + '}' + result.slice(hitPos + shift); shift++;
+      applied.push('Inserted [ and missing } for array key ' + keyName);
+    } else if (hitType === 'comma') {
+      result = result.slice(0, bracePos + shift) + '[' + result.slice(bracePos + shift); shift++;
+      result = result.slice(0, hitPos + shift) + '}]' + result.slice(hitPos + shift); shift += 2;
+      applied.push('Inserted [ and missing }] for array key ' + keyName);
+    }
+  }
+
+  result = result.replace(
+    /("(?:[\w]+)")\s*:\s*\n(\s*)("(?:[\w]+")\s*:)/g,
+    function(m, k1, ws, k2) {
+      applied.push('Inserted missing { after ' + k1 + ':');
+      return k1 + ': {\n' + ws + k2;
+    }
+  );
+
+  result = result.replace(
+    /("(?:[\w]+)")\s*:\s*(\n\s*)\{([\s\S]*?)\}(\s*\n\s*\])/g,
+    function(m, key, ws, content, closeArr) {
+      applied.push('Inserted missing [ for array key ' + key);
+      return key + ': [' + ws + '{' + content + '}' + closeArr;
+    }
+  );
+
+  return { result, applied };
+}
+
+function stripWrapperQuotes(s) {
+  const noLeading = s.replace(/^"+/, '').trim();
+  return noLeading.replace(/([}\]])\s*"+\s*$/, '$1').trim();
+}
+
+function smartBracketFix(s) {
+  let result = s.trimEnd();
+  const applied = [];
+  let { square } = countUnclosed(result);
+  if (square > 0) {
+    if (result.endsWith('}')) {
+      result = result.slice(0, -1) + ']'.repeat(square) + '}';
+      applied.push('Inserted ' + square + ' missing ] before }');
+    } else {
+      result = result.replace(/,\s*$/, '') + ']'.repeat(square);
+      applied.push('Added ' + square + ' missing ]');
+    }
+  } else if (square < 0) {
+    let removed = 0, abs = Math.abs(square);
+    for (let i = result.length - 1; i >= 0 && removed < abs; i--) {
+      if (result[i] === ']') { result = result.slice(0, i) + result.slice(i + 1); removed++; }
+    }
+    if (removed) applied.push('Removed ' + removed + ' stray ]');
+  }
+  let { curly } = countUnclosed(result);
+  if (curly > 0) {
+    result = result.replace(/,\s*$/, '') + '}'.repeat(curly);
+    applied.push('Added ' + curly + ' missing }');
+  } else if (curly < 0) {
+    if (looksLikeFragment(result)) {
+      result = '{' + result;
+      applied.push('Added missing opening {');
+      const { curly: c2 } = countUnclosed(result);
+      if (c2 > 0) {
+        result = result.replace(/,\s*$/, '') + '}';
+        applied.push('Added missing closing }');
+      } else if (c2 < 0) {
+        for (let i = result.length - 1; i >= 0; i--) {
+          if (result[i] === '}') { result = result.slice(0, i) + result.slice(i + 1); break; }
+        }
+        applied.push('Removed stray }');
+      }
+    } else {
+      for (let i = result.length - 1; i >= 0; i--) {
+        if (result[i] === '}') { result = result.slice(0, i) + result.slice(i + 1); break; }
+      }
+      applied.push('Removed stray }');
+    }
+  } else if (curly === 0 && looksLikeFragment(result)) {
+    result = '{' + result + '}';
+    applied.push('Wrapped bare key-value pairs in {}');
+  }
+  return { result, applied };
+}
+
+function tryParse(s) {
+  try { return { ok: true, data: expandStringifiedValues(JSON.parse(s)) }; }
+  catch(e) { return { ok: false, error: e.message }; }
+}
+
+function tryParseOrRepair(s, extraFixes) {
+  const direct = tryParse(s);
+  if (direct.ok) return direct;
+  const { result: fixed, applied } = smartBracketFix(s);
+  if (applied.length && fixed !== s) {
+    const repaired = tryParse(fixed);
+    if (repaired.ok) return { ...repaired, fixes: [...(extraFixes || []), ...applied] };
+  }
+  return null;
+}
+
+function dedup(arr) { return arr.filter((v, i, a) => a.indexOf(v) === i); }
+
+function deepClean(raw) {
+  const fixes = [];
+  let s = raw.trim();
+
+  if (s.indexOf('""') !== -1) {
+    const norm = s.replace(/""/g, '"').trim();
+    fixes.push('Normalised double-double-quotes ("")');
+    let r = tryParse(norm);
+    if (r.ok) return { ...r, fixes };
+
+    let repaired = norm;
+    const { result: rMac, applied: aMac } = fixMissingArrayClose(repaired);
+    if (aMac.length) { repaired = rMac; fixes.push(...aMac); }
+    const { result: rUai, applied: aUai } = fixUnclosedArrayItems(repaired);
+    if (aUai.length) { repaired = rUai; fixes.push(...aUai); }
+    const { result: rMao, applied: aMao } = fixMissingArrayOpen(repaired);
+    if (aMao.length) { repaired = rMao; fixes.push(...aMao); }
+
+    if (repaired !== norm) {
+      const strippedR = stripWrapperQuotes(repaired);
+      const reQuotedR = '"' + strippedR;
+      r = tryParseOrRepair('{' + reQuotedR + '}', fixes);
+      if (r && r.ok) return { ...r, fixes: dedup([...fixes, ...(r.fixes || [])]) };
+      r = tryParseOrRepair('{' + strippedR + '}', fixes);
+      if (r && r.ok) return { ...r, fixes: dedup([...fixes, ...(r.fixes || [])]) };
+    }
+
+    const { result: rStruct, applied: aStruct } = fixStructuralBrackets(repaired);
+    if (aStruct.length) fixes.push(...aStruct);
+    const stripped = stripWrapperQuotes(rStruct);
+    const reQuoted = '"' + stripped;
+    r = tryParseOrRepair('{' + reQuoted + '}', fixes);
+    if (r && r.ok) return { ...r, fixes: dedup([...fixes, ...(r.fixes || [])]) };
+    r = tryParseOrRepair('{' + stripped + '}', fixes);
+    if (r && r.ok) return { ...r, fixes: dedup([...fixes, ...(r.fixes || [])]) };
+    r = tryParse('[' + stripped + ']');
+    if (r.ok) return { ...r, fixes: [...fixes, 'Wrapped in []'] };
+  }
+
+  let result = tryParseOrRepair(s, fixes);
+  if (result && result.ok) return { ...result, fixes: dedup([...fixes, ...(result.fixes || [])]) };
+
+  let prev = null, iters = 0, su = s;
+  while (prev !== su && iters < 10) {
+    prev = su;
+    su = su
+      .replace(/\\"/g, '"')
+      .replace(/\\\\/g, '\\')
+      .replace(/\\n/g, '\n')
+      .replace(/\\r/g, '')
+      .replace(/\\t/g, '\t')
+      .replace(/\\u([0-9a-fA-F]{4})/g, function(_, h) { return String.fromCharCode(parseInt(h, 16)); });
+    iters++;
+  }
+  result = tryParseOrRepair(su, fixes);
+  if (result && result.ok) return { ...result, fixes: dedup([...fixes, ...(result.fixes || []), 'Unescaped backslash sequences']) };
+
+  const noComma = s.replace(/,\s*([}\]])/g, '$1');
+  if (noComma !== s) {
+    result = tryParseOrRepair(noComma, fixes);
+    if (result && result.ok) return { ...result, fixes: dedup([...fixes, ...(result.fixes || []), 'Removed trailing commas']) };
+    s = noComma;
+    fixes.push('Removed trailing commas');
+  }
+
+  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+    const inner = s.slice(1, -1).trim();
+    result = tryParseOrRepair(inner, fixes);
+    if (result && result.ok) return { ...result, fixes: dedup([...fixes, ...(result.fixes || []), 'Unwrapped outer string wrapper']) };
+    result = tryParseOrRepair('{' + inner + '}', fixes);
+    if (result && result.ok) return { ...result, fixes: dedup([...fixes, ...(result.fixes || []), 'Unwrapped and wrapped fragment']) };
+  }
+
+  const objMatch = s.match(/\{[\s\S]*\}/);
+  const arrMatch = s.match(/\[[\s\S]*\]/);
+  if (objMatch) { result = tryParseOrRepair(objMatch[0], fixes); if (result && result.ok) return { ...result, fixes: dedup([...fixes, ...(result.fixes || []), 'Extracted JSON object']) }; }
+  if (arrMatch) { result = tryParseOrRepair(arrMatch[0], fixes); if (result && result.ok) return { ...result, fixes: dedup([...fixes, ...(result.fixes || []), 'Extracted JSON array']) }; }
+
+  result = tryParseOrRepair(s.replace(/'/g, '"'), fixes);
+  if (result && result.ok) return { ...result, fixes: dedup([...fixes, ...(result.fixes || []), 'Converted single quotes to double quotes']) };
+
+  const uq = s.replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)(\s*:)/g, '$1"$2"$3');
+  result = tryParseOrRepair(uq, fixes);
+  if (result && result.ok) return { ...result, fixes: dedup([...fixes, ...(result.fixes || []), 'Quoted unquoted keys']) };
+  result = tryParseOrRepair('{' + uq + '}', fixes);
+  if (result && result.ok) return { ...result, fixes: dedup([...fixes, ...(result.fixes || []), 'Quoted unquoted keys + wrapped']) };
+
+  result = tryParse(s.replace(/\\/g, ''));
+  if (result.ok) return { ...result, fixes: [...fixes, 'Stripped all backslashes'] };
+
+  return { ok: false, error: result.error, raw: s };
+}
+
+
+// ─── Syntax highlighter ────────────────────────────────────
+function highlight(json) {
+  return json
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(
+      /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+      function(match) {
+        if (/^"/.test(match)) {
+          if (/:$/.test(match)) {
+            return '<span class="j-key">' + match.slice(0, -1) + '</span><span class="j-punc">:</span>';
+          }
+          return '<span class="j-str">' + match + '</span>';
+        }
+        if (/true|false/.test(match)) return '<span class="j-bool">' + match + '</span>';
+        if (/null/.test(match)) return '<span class="j-null">' + match + '</span>';
+        return '<span class="j-num">' + match + '</span>';
+      }
+    )
+    .replace(/([{}\[\],])/g, '<span class="j-punc">$1</span>');
+}
+
+// ─── Count keys / depth ────────────────────────────────────
+function countKeys(obj) {
+  if (typeof obj !== 'object' || obj === null) return 0;
+  let c = 0;
+  if (Array.isArray(obj)) { obj.forEach(i => { c += countKeys(i); }); }
+  else { Object.keys(obj).forEach(k => { c++; c += countKeys(obj[k]); }); }
+  return c;
+}
+function maxDepth(obj, d) {
+  d = d || 0;
+  if (typeof obj !== 'object' || obj === null) return d;
+  const vals = Array.isArray(obj) ? obj : Object.values(obj);
+  if (!vals.length) return d + 1;
+  return Math.max.apply(null, vals.map(function(v) { return maxDepth(v, d + 1); }));
+}
+
+// ─── Render output ─────────────────────────────────────────
+function renderOutput(data, fixes) {
+  const jsonStr = JSON.stringify(data, null, currentIndent);
+  const out = document.getElementById('outputArea');
+  out.innerHTML = '<div>' + highlight(jsonStr) + '</div>';
+  document.getElementById('copyBtn').style.display = '';
+  document.getElementById('copyRawBtn').style.display = '';
+
+  const keys = countKeys(data);
+  const depth = maxDepth(data);
+  const size = new Blob([jsonStr]).size;
+  document.getElementById('keysCount').style.display = '';
+  document.getElementById('depthStat').style.display = '';
+  document.getElementById('sizeStat').style.display = '';
+  document.getElementById('keysVal').textContent = keys;
+  document.getElementById('depthVal').textContent = depth;
+  document.getElementById('sizeVal').textContent = size < 1024 ? size + ' B' : (size / 1024).toFixed(1) + ' KB';
+  document.getElementById('statusDot').className = 'status-dot dot-ok';
+
+  const fixNote = (fixes && fixes.length)
+    ? '\u2713 Fixed: ' + fixes.join(' \u00b7 ')
+    : '\u2713 Valid JSON \u2014 no fixes needed';
+  document.getElementById('msgStat').textContent = fixNote;
+  document.getElementById('msgStat').style.color = 'var(--accent)';
+}
+
+function renderError(msg) {
+  document.getElementById('outputArea').innerHTML =
+    '<div class="error-msg">\u26a0 Parse Error\n\n' + msg + '\n\nTip: Check for unmatched brackets, missing commas, or invalid characters.</div>';
+  document.getElementById('copyBtn').style.display = 'none';
+  document.getElementById('copyRawBtn').style.display = 'none';
+  document.getElementById('keysCount').style.display = 'none';
+  document.getElementById('depthStat').style.display = 'none';
+  document.getElementById('sizeStat').style.display = 'none';
+  document.getElementById('statusDot').className = 'status-dot dot-err';
+  document.getElementById('msgStat').textContent = 'Invalid JSON';
+  document.getElementById('msgStat').style.color = 'var(--danger)';
+  cleanedData = null;
+}
+
+// ─── Main process ──────────────────────────────────────────
+function process() {
+  const raw = document.getElementById('inputArea').value;
+  if (!raw.trim()) return;
+  const result = deepClean(raw);
+  if (result.ok) {
+    cleanedData = result.data;
+    renderOutput(cleanedData, result.fixes);
+  } else {
+    renderError(result.error);
+  }
+}
+
+function autoProcess() {
+  const raw = document.getElementById('inputArea').value.trim();
+  if (!raw) {
+    cleanedData = null;
+    document.getElementById('outputArea').innerHTML =
+      '<div class="empty-state"><div class="empty-icon">\u2736</div><div>Your cleaned JSON will appear here</div></div>';
+    document.getElementById('copyBtn').style.display = 'none';
+    document.getElementById('copyRawBtn').style.display = 'none';
+    document.getElementById('keysCount').style.display = 'none';
+    document.getElementById('depthStat').style.display = 'none';
+    document.getElementById('sizeStat').style.display = 'none';
+    document.getElementById('statusDot').className = 'status-dot dot-idle';
+    document.getElementById('msgStat').textContent = 'Ready';
+    document.getElementById('msgStat').style.color = '';
+    return;
+  }
+  if (raw.length < 5000) process();
+}
+
+// ─── Clipboard ─────────────────────────────────────────────
+async function pasteClipboard() {
+  try {
+    const txt = await navigator.clipboard.readText();
+    document.getElementById('inputArea').value = txt;
+    process();
+  } catch(e) { alert('Allow clipboard access or paste manually (Ctrl+V / \u2318+V)'); }
+}
+
+function clearInput() {
+  document.getElementById('inputArea').value = '';
+  autoProcess();
+}
+
+function copyOutput() {
+  if (!cleanedData) return;
+  navigator.clipboard.writeText(JSON.stringify(cleanedData, null, currentIndent))
+    .then(function() { showToast('\u2713 Formatted JSON copied!'); });
+}
+
+function copyRaw() {
+  if (!cleanedData) return;
+  navigator.clipboard.writeText(JSON.stringify(cleanedData))
+    .then(function() { showToast('\u2713 Minified JSON copied!'); });
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function() { t.classList.remove('show'); }, 2000);
+}
+
+// ─── Keyboard shortcut ─────────────────────────────────────
+document.addEventListener('keydown', function(e) {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); process(); }
+});
+</script>
+</body>
+</html>
