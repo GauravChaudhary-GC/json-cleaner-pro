@@ -2,7 +2,7 @@
 
 > Fix broken JSON from APIs and data pipelines instantly. Free, offline, no login.
 
-**[→ Try it free](https://YOUR_USERNAME.github.io/json-cleaner-pro/app)** · **[Landing page](https://YOUR_USERNAME.github.io/json-cleaner-pro/)** · **[Chrome Extension](#)**
+**[→ Try it free](https://GauravChaudhary-GC.github.io/json-cleaner-pro/app)** · **[Landing page](https://GauravChaudhary-GC.github.io/json-cleaner-pro/)** · **[Chrome Extension](#)**
 
 ---
 
