@@ -46,4 +46,4 @@ No data collected. No analytics. No external requests except Google Fonts. [Full
 
 ---
 
-*Built by a Senior Data PM who got tired of broken JSON.*
+*Built by someone who got tired of broken JSON.*
