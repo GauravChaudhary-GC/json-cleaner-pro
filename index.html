@@ -184,7 +184,7 @@
 
 <nav>
   <div class="nav-logo">JSON Cleaner Pro</div>
-  <div class="nav-tag">v2.7</div>
+  <div class="nav-tag">v2.8</div>
   <div class="nav-links">
     <a class="nav-link" href="app.html">Open Tool</a>
     <a class="nav-link" href="privacy.html">Privacy</a>
@@ -193,7 +193,7 @@
 </nav>
 
 <div class="hero">
-  <div class="hero-badge"><span class="badge-dot"></span> v2.7 &mdash; 28 patterns handled</div>
+  <div class="hero-badge"><span class="badge-dot"></span> v2.8 &mdash; 31 patterns handled</div>
   <h1>Fix broken JSON<br><span>in one paste</span></h1>
   <p class="hero-sub">Paste any malformed JSON from your pipeline, API, or database. Get clean, syntax-highlighted output instantly. Zero setup, works offline.</p>
   <div class="hero-btns">
@@ -256,8 +256,8 @@
     </div>
     <div class="feature-card">
       <div class="feature-icon">&#x1F527;</div>
-      <div class="feature-title">Bad escapes + commas</div>
-      <div class="feature-desc">Fixes <code>\x</code> hex escapes, literal newlines in strings, double commas, trailing commas, single quotes.</div>
+      <div class="feature-title">Inner quotes, escapes &amp; commas</div>
+      <div class="feature-desc">Escapes unescaped inner quotes like <code>"John "Danger" Doe"</code>, fixes <code>\x</code> hex escapes, literal newlines, double commas, trailing commas, single quotes.</div>
     </div>
   </div>
 </div>
@@ -297,9 +297,9 @@ const examples = [
     clean: '<span class="j-punc">{</span>\n  <span class="j-key">"name"</span><span class="j-punc">:</span> <span class="j-str">"Alice"</span><span class="j-punc">,</span>\n  <span class="j-key">"extra"</span><span class="j-punc">:</span> <span class="j-punc">{</span>\n    <span class="j-key">"city"</span><span class="j-punc">:</span> <span class="j-str">"NYC"</span><span class="j-punc">,</span>\n    <span class="j-key">"age"</span><span class="j-punc">:</span> <span class="j-num">30</span>\n  <span class="j-punc">}</span>\n<span class="j-punc">}</span>'
   },
   {
-    fix: 'Windows paths + double commas',
-    dirty: '{"path":"C:\\\\Users\\\\Alice",\n "tags":["a",,"b"],"name":"Alice",}',
-    clean: '<span class="j-punc">{</span>\n  <span class="j-key">"path"</span><span class="j-punc">:</span> <span class="j-str">"C:\\Users\\Alice"</span><span class="j-punc">,</span>\n  <span class="j-key">"tags"</span><span class="j-punc">:</span> <span class="j-punc">[</span><span class="j-str">"a"</span><span class="j-punc">,</span> <span class="j-str">"b"</span><span class="j-punc">],</span>\n  <span class="j-key">"name"</span><span class="j-punc">:</span> <span class="j-str">"Alice"</span>\n<span class="j-punc">}</span>'
+    fix: 'Unescaped inner quotes + literal newlines',
+    dirty: '{"name":"John "Danger" Doe",\n "bio":"Loves coding\nNew lines here",\n "path":"C:\\users\\john"}',
+    clean: '<span class="j-punc">{</span>\n  <span class="j-key">"name"</span><span class="j-punc">:</span> <span class="j-str">"John \\"Danger\\" Doe"</span><span class="j-punc">,</span>\n  <span class="j-key">"bio"</span><span class="j-punc">:</span> <span class="j-str">"Loves coding\\nNew lines here"</span><span class="j-punc">,</span>\n  <span class="j-key">"path"</span><span class="j-punc">:</span> <span class="j-str">"C:\\\\users\\\\john"</span>\n<span class="j-punc">}</span>'
   }
 ];
 
