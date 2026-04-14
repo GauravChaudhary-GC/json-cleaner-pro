@@ -339,9 +339,10 @@
 
 
 <header>
-  <a href="index.html" style="font-size:11px;color:var(--muted);text-decoration:none;font-family:'DM Sans',sans-serif;margin-right:4px;transition:color 0.15s;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">← Home</a>
   <div class="logo">JSON Cleaner Pro</div>
-  <div class="logo-tag">v2.5</div>
+  <div class="logo-tag">v2.7</div>
+  <a href="index.html" style="font-size:12px;color:var(--muted);text-decoration:none;font-family:'DM Sans',sans-serif;margin-left:8px;transition:color 0.15s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">&#8592; Home</a>
+
 
   <div class="options-bar">
     <span class="opt-label">Indent:</span>
@@ -413,12 +414,10 @@ Examples of what gets cleaned:
 <div class="copied-toast" id="toast">✓ Copied to clipboard!</div>
 
 <script>
-// JSON CLEANER PRO — Chrome Extension popup.js v2.5
-// expandStringifiedValues extended: handles all bracket-mismatch variants in stringified values:
-//   "{...}]"  — trailing ], wrap in array
-//   "[{...}"  — missing ], append ]
-//   "[{...\"val\"]" — missing } before ], insert }
-//   "[\"key\":...}]" — missing { after [, insert {
+// JSON CLEANER PRO -- Chrome Extension popup.js v2.7
+// New: fixArraysClosedByBrace, fixJsValues, fixLiteralNewlines,
+//      fixBadEscapes, fixUnquotedValues, applyPreFixes coordinator
+// Stages 2.5-2.7 replaced by applyPreFixes (runs all pre-fixes in correct order)
 
 let currentIndent = 2;
 let cleanedData = null;
@@ -426,43 +425,30 @@ let cleanedData = null;
 function expandStringifiedValues(obj) {
   if (typeof obj === 'string') {
     const t = obj.trim();
-
-    // 1. Perfect: valid JSON object or array
     if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
       try { return expandStringifiedValues(JSON.parse(t)); } catch(e) {}
     }
-
-    // 2. "{...}]" — object with trailing ] is a single-element array hint
     if (t.startsWith('{') && /\}\s*\]\s*$/.test(t)) {
       const clean = t.replace(/\}\s*\]\s*$/, '}');
       try { return [expandStringifiedValues(JSON.parse(clean))]; } catch(e) {}
     }
-
-    // 3. "[{...}" — array+object missing closing ] -> append ]
     if (t.startsWith('[') && t.endsWith('}')) {
       try { return expandStringifiedValues(JSON.parse(t + ']')); } catch(e) {}
     }
-
-    // 4. "[{...\"val\"]" — array+object missing closing } before ] -> insert } before ]
     if (t.startsWith('[{') && t.endsWith(']') && !t.endsWith('}]')) {
       try { return expandStringifiedValues(JSON.parse(t.slice(0, -1) + '}]')); } catch(e) {}
     }
-
-    // 5. "[\"key\":...}]" or "[\"key\":...}" — array missing opening { for object -> insert { after [
     if (t.startsWith('[') && !t.startsWith('[{') && (t.endsWith('}]') || t.endsWith('}'))) {
       const fixed = '[{' + t.slice(1);
       try { return expandStringifiedValues(JSON.parse(fixed)); } catch(e) {}
       try { return expandStringifiedValues(JSON.parse(fixed + ']')); } catch(e) {}
     }
-
-    // 6. "[..." with trailing garbage after last ] — trim and retry
     if (t.startsWith('[')) {
       const lastBracket = t.lastIndexOf(']');
       if (lastBracket > 0 && lastBracket < t.length - 1) {
         try { return expandStringifiedValues(JSON.parse(t.slice(0, lastBracket + 1))); } catch(e) {}
       }
     }
-
     return obj;
   }
   if (Array.isArray(obj)) return obj.map(expandStringifiedValues);
@@ -544,7 +530,6 @@ function fixMissingArrayOpen(s) {
 function fixStructuralBrackets(s) {
   const applied = [];
   let result = s;
-
   const keyColonBrace = /("[\w]+")\s*:\s*\n[ \t]*\{/g;
   let m;
   const insertions = [];
@@ -567,7 +552,6 @@ function fixStructuralBrackets(s) {
     }
     if (hitType) insertions.push({ bracePos, hitPos, hitType, keyName: m[1] });
   }
-
   let shift = 0;
   for (const { bracePos, hitPos, hitType, keyName } of insertions) {
     if (hitType === 'bracket') {
@@ -580,7 +564,6 @@ function fixStructuralBrackets(s) {
       applied.push('Inserted [ and missing }] for array key ' + keyName);
     }
   }
-
   result = result.replace(
     /("(?:[\w]+)")\s*:\s*\n(\s*)("(?:[\w]+")\s*:)/g,
     function(m, k1, ws, k2) {
@@ -588,7 +571,6 @@ function fixStructuralBrackets(s) {
       return k1 + ': {\n' + ws + k2;
     }
   );
-
   result = result.replace(
     /("(?:[\w]+)")\s*:\s*(\n\s*)\{([\s\S]*?)\}(\s*\n\s*\])/g,
     function(m, key, ws, content, closeArr) {
@@ -596,13 +578,127 @@ function fixStructuralBrackets(s) {
       return key + ': [' + ws + '{' + content + '}' + closeArr;
     }
   );
-
   return { result, applied };
 }
 
 function stripWrapperQuotes(s) {
   const noLeading = s.replace(/^"+/, '').trim();
   return noLeading.replace(/([}\]])\s*"+\s*$/, '$1').trim();
+}
+
+// NEW: Detect Windows path string values where backslashes need escaping.
+// Handles "C:\path\" where \" prevents the string from closing.
+// Uses a character walk (not regex) for correct boundary detection.
+function fixWindowsPaths(s) {
+  const applied = [];
+  let i = 0;
+  const out = [];
+  while (i < s.length) {
+    if (s[i] === '"' &&
+        i + 3 < s.length &&
+        /[A-Za-z]/.test(s[i + 1]) &&
+        s[i + 2] === ':' &&
+        s[i + 3] === '\\') {
+      let j = i + 1, pathChars = '', stringClosed = false, hadEscapedQuote = false;
+      while (j < s.length) {
+        const c = s[j];
+        if (c === '\\' && j + 1 < s.length && s[j + 1] === '"') {
+          pathChars += '\\"'; j += 2; hadEscapedQuote = true;
+          const afterThis = s.slice(j).trimStart();
+          if (/^[,}\]\n]/.test(afterThis) || afterThis === '') { stringClosed = true; break; }
+          continue;
+        }
+        if (c === '\\') { pathChars += c + (s[j + 1] || ''); j += 2; continue; }
+        if (c === '"') { j++; stringClosed = true; break; }
+        if (c === '\n') break;
+        pathChars += c; j++;
+      }
+      const fixedPath = pathChars.replace(/\\"/g, '').replace(/\\/g, '\\\\');
+      const changed = fixedPath !== pathChars.replace(/\\"/g, '') || hadEscapedQuote;
+      if (changed) {
+        applied.push('Escaped backslashes in Windows file path');
+        out.push('"' + fixedPath + '"');
+      } else {
+        out.push(s.slice(i, j));
+      }
+      i = j;
+    } else {
+      out.push(s[i]); i++;
+    }
+  }
+  return { result: out.join(''), applied };
+}
+
+// NEW: Re-escape unescaped double quotes inside string values.
+// Uses structural JSON parsing to distinguish key quotes from value quotes.
+// Uses odd-quote-count heuristic to handle inner commas (ambiguity cases).
+function fixUnescapedQuotesInValues(s) {
+  const applied = [];
+  let result = '', i = 0, changed = false;
+  const stack = [];
+  let expectingKey = true, afterColon = false;
+  function isValuePosition() {
+    if (stack.length === 0) return true;
+    return stack[stack.length - 1] === 'array' || afterColon;
+  }
+  while (i < s.length) {
+    const c = s[i];
+    if (c === '{') { stack.push('object'); expectingKey = true; afterColon = false; result += c; i++; continue; }
+    if (c === '[') { stack.push('array'); result += c; i++; continue; }
+    if (c === '}') { stack.pop(); expectingKey = stack.length > 0 && stack[stack.length - 1] === 'object'; afterColon = false; result += c; i++; continue; }
+    if (c === ']') { stack.pop(); result += c; i++; continue; }
+    if (c === ':') { afterColon = true; expectingKey = false; result += c; i++; continue; }
+    if (c === ',') { afterColon = false; if (stack.length > 0 && stack[stack.length - 1] === 'object') expectingKey = true; result += c; i++; continue; }
+    if (/\s/.test(c)) { result += c; i++; continue; }
+    if (c === '"') {
+      const inValue = isValuePosition() && !expectingKey;
+      if (!inValue) {
+        result += '"'; i++;
+        while (i < s.length) {
+          const sc = s[i];
+          if (sc === '\\') { result += sc + (s[i + 1] || ''); i += 2; continue; }
+          if (sc === '"') { result += '"'; i++; break; }
+          result += sc; i++;
+        }
+        expectingKey = false;
+      } else {
+        result += '"'; i++;
+        let strContent = '';
+        while (i < s.length) {
+          const sc = s[i];
+          if (sc === '\\') { strContent += sc + (s[i + 1] || ''); i += 2; continue; }
+          if (sc === '"') {
+            let j = i + 1;
+            while (j < s.length && s[j] === ' ') j++;
+            const next = s[j];
+            if (next === '}' || next === ']' || next === '\n' || next === '\r' || j >= s.length) {
+              result += strContent + '"'; i++; break;
+            } else if (next === ',') {
+              const lineEnd = s.indexOf('\n', j);
+              const lineRem = lineEnd === -1 ? s.slice(j) : s.slice(j, lineEnd);
+              let qc = 0, k = 0;
+              while (k < lineRem.length) {
+                if (lineRem[k] === '\\') { k += 2; continue; }
+                if (lineRem[k] === '"') qc++;
+                k++;
+              }
+              if (qc % 2 === 0) { result += strContent + '"'; i++; break; }
+              else { strContent += '\\"'; changed = true; i++; }
+            } else {
+              strContent += '\\"'; changed = true; i++;
+            }
+          } else { strContent += sc; i++; }
+        }
+        afterColon = false;
+        expectingKey = stack.length > 0 && stack[stack.length - 1] === 'object';
+      }
+      continue;
+    }
+    result += c; i++;
+    if (afterColon && !/\s/.test(c)) { afterColon = false; expectingKey = stack.length > 0 && stack[stack.length - 1] === 'object'; }
+  }
+  if (changed) applied.push('Re-escaped unescaped quotes inside string values');
+  return { result, applied };
 }
 
 function smartBracketFix(s) {
@@ -673,6 +769,183 @@ function tryParseOrRepair(s, extraFixes) {
 
 function dedup(arr) { return arr.filter((v, i, a) => a.indexOf(v) === i); }
 
+// -------------------------------------------------------
+// fixArraysClosedByBrace
+// Character walk with o/a stack (o = object, a = array).
+// When } is encountered and top of stack is array: emit ] instead.
+// When ] is encountered and top of stack is object: emit } instead.
+// Runs BEFORE fixUnescapedQuotesInValues.
+// -------------------------------------------------------
+function fixArraysClosedByBrace(s) {
+  const applied = [];
+  const stack = [];
+  let inStr = false, esc = false, result = '';
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (esc) { esc = false; result += c; continue; }
+    if (c === '\\' && inStr) { esc = true; result += c; continue; }
+    if (c === '"') { inStr = !inStr; result += c; continue; }
+    if (inStr) { result += c; continue; }
+    if (c === '{') { stack.push('o'); result += c; continue; }
+    if (c === '[') { stack.push('a'); result += c; continue; }
+    if (c === '}') {
+      if (stack.length && stack[stack.length - 1] === 'a') {
+        result += ']';
+        applied.push('Replaced } with ] to close mismatched array');
+        stack.pop();
+        // The } may also be closing the parent object
+        if (stack.length && stack[stack.length - 1] === 'o') { result += c; stack.pop(); }
+        continue;
+      }
+      if (stack.length) stack.pop();
+      result += c; continue;
+    }
+    if (c === ']') {
+      if (stack.length && stack[stack.length - 1] === 'o') {
+        result += '}';
+        applied.push('Replaced ] with } to close mismatched object');
+        stack.pop();
+        if (stack.length && stack[stack.length - 1] === 'a') { result += c; stack.pop(); }
+        continue;
+      }
+      if (stack.length) stack.pop();
+      result += c; continue;
+    }
+    result += c;
+  }
+  return { result, applied };
+}
+
+// -------------------------------------------------------
+// fixJsValues
+// Replaces JS-only constructs with JSON equivalents.
+// Order: block comments -> line comments -> functions -> primitives.
+// -------------------------------------------------------
+function fixJsValues(s) {
+  const applied = [];
+  let result = s;
+  const noBlock = result.replace(/\/\*[\s\S]*?\*\//g, '');
+  if (noBlock !== result) { applied.push('Removed block comments'); result = noBlock; }
+  // Line comments: avoid matching http:// by requiring no colon before //
+  const noLine = result.replace(/(?<!:)\/\/[^\n]*/g, '');
+  if (noLine !== result) { applied.push('Removed line comments'); result = noLine; }
+  const noFunc = result.replace(/:\s*function\s*\([^)]*\)\s*\{(?:[^{}]|\{[^{}]*\})*\}/g, ': null');
+  if (noFunc !== result) { applied.push('Replaced function values with null'); result = noFunc; }
+  const noUndef = result.replace(/:\s*undefined\b/g, ': null');
+  if (noUndef !== result) { applied.push('Replaced undefined with null'); result = noUndef; }
+  const noNaN = result.replace(/:\s*NaN\b/g, ': null');
+  if (noNaN !== result) { applied.push('Replaced NaN with null'); result = noNaN; }
+  const noInf = result.replace(/:\s*-?Infinity\b/g, ': null');
+  if (noInf !== result) { applied.push('Replaced Infinity with null'); result = noInf; }
+  const noCap = result.replace(/:\s*True\b/g, ': true').replace(/:\s*False\b/g, ': false');
+  if (noCap !== result) { applied.push('Replaced True/False with true/false'); result = noCap; }
+  const noNone = result.replace(/:\s*None\b/g, ': null');
+  if (noNone !== result) { applied.push('Replaced None with null'); result = noNone; }
+  return { result, applied };
+}
+
+// -------------------------------------------------------
+// fixLiteralNewlines
+// Escapes real newline/CR characters inside JSON strings.
+// Must run before any string-structure analysis.
+// -------------------------------------------------------
+function fixLiteralNewlines(s) {
+  const applied = [];
+  let result = '', inStr = false, esc = false, changed = false;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (esc) { esc = false; result += c; continue; }
+    if (c === '\\' && inStr) { esc = true; result += c; continue; }
+    if (c === '"') { inStr = !inStr; result += c; continue; }
+    if (inStr && c === '\n') { result += '\\n'; changed = true; continue; }
+    if (inStr && c === '\r') { result += '\\r'; changed = true; continue; }
+    result += c;
+  }
+  if (changed) applied.push('Escaped literal newlines inside strings');
+  return { result, applied };
+}
+
+// -------------------------------------------------------
+// fixBadEscapes
+// Inside strings: converts or removes invalid JSON escape sequences.
+// Valid JSON escapes: " \ / b f n r t u
+// \xNN hex: convert to char if printable ASCII (32-126), else emit ?
+// Any other \X: strip backslash, keep X
+// -------------------------------------------------------
+function fixBadEscapes(s) {
+  const applied = [];
+  const VALID_ESC = new Set(['"', '\\', '/', 'b', 'f', 'n', 'r', 't', 'u']);
+  let result = '', inStr = false, changed = false, i = 0;
+  while (i < s.length) {
+    const c = s[i];
+    if (c === '"' && !inStr) { inStr = true; result += c; i++; continue; }
+    if (!inStr) { result += c; i++; continue; }
+    if (c === '\\') {
+      const next = s[i + 1] || '';
+      if (next === '"') { result += '\\"'; i += 2; continue; }
+      if (VALID_ESC.has(next)) { result += c + next; i += 2; continue; }
+      if (next === 'x' && i + 3 < s.length) {
+        const hex = s.slice(i + 2, i + 4);
+        if (/^[0-9a-fA-F]{2}$/.test(hex)) {
+          const code = parseInt(hex, 16);
+          result += (code >= 32 && code <= 126) ? String.fromCharCode(code) : '?';
+          applied.push('Converted \\x escape'); changed = true; i += 4; continue;
+        }
+      }
+      // Strip the backslash, keep the next character
+      result += next; changed = true; i += 2; continue;
+    }
+    if (c === '"') { inStr = false; result += c; i++; continue; }
+    result += c; i++;
+  }
+  if (changed && !applied.length) applied.push('Removed invalid escape sequences');
+  return { result, applied };
+}
+
+// -------------------------------------------------------
+// fixUnquotedValues
+// Wraps bare identifier values in double quotes.
+// Skips JSON/JS keywords that fixJsValues already handles.
+// -------------------------------------------------------
+function fixUnquotedValues(s) {
+  const KEYWORDS = new Set(['true', 'false', 'null', 'undefined', 'nan', 'infinity', 'none', 'function']);
+  const applied = [];
+  const fixed = s.replace(/:\s*([a-zA-Z_$][a-zA-Z0-9_$]*)\s*([,}\]\n])/g, function(m, word, after) {
+    if (KEYWORDS.has(word.toLowerCase())) return m;
+    applied.push('Quoted unquoted value: ' + word);
+    return ': "' + word + '"' + after;
+  });
+  return { result: fixed, applied };
+}
+
+// -------------------------------------------------------
+// applyPreFixes
+// Coordinator: runs all pre-processing in the correct order.
+// Returns { result, fixes }.
+// -------------------------------------------------------
+function applyPreFixes(s) {
+  let cur = s;
+  const fixes = [];
+  function run(fn) {
+    const { result, applied } = fn(cur);
+    if (applied.length) fixes.push(...applied);
+    cur = result;
+  }
+  run(fixJsValues);           // comments + JS-only primitives first
+  run(fixLiteralNewlines);    // real newlines inside strings
+  run(fixBadEscapes);         // invalid \X sequences
+  run(fixMissingArrayOpen);   // insert missing { after [ (must run before fixArraysClosedByBrace)
+  run(fixArraysClosedByBrace);// bracket mismatch (} closes [)
+  run(fixWindowsPaths);       // Windows paths must close before quote-escaping
+  run(fixUnescapedQuotesInValues); // re-escape inner quotes in values
+  run(fixUnquotedValues);     // bare identifier values
+  const noDouble = cur.replace(/,(\s*),/g, ',$1');
+  if (noDouble !== cur) { fixes.push('Removed duplicate commas'); cur = noDouble; }
+  const noTrail = cur.replace(/,\s*([}\]])/g, '$1');
+  if (noTrail !== cur) { fixes.push('Removed trailing commas'); cur = noTrail; }
+  return { result: cur, fixes };
+}
+
 function deepClean(raw) {
   const fixes = [];
   let s = raw.trim();
@@ -712,9 +985,33 @@ function deepClean(raw) {
     if (r.ok) return { ...r, fixes: [...fixes, 'Wrapped in []'] };
   }
 
+  // Stage 2: straight parse
   let result = tryParseOrRepair(s, fixes);
   if (result && result.ok) return { ...result, fixes: dedup([...fixes, ...(result.fixes || [])]) };
 
+  // Stage 2.5-2.8 (v2.7): applyPreFixes coordinator
+  // Runs: fixJsValues -> fixLiteralNewlines -> fixBadEscapes ->
+  //       fixArraysClosedByBrace -> fixWindowsPaths ->
+  //       fixUnescapedQuotesInValues -> fixUnquotedValues ->
+  //       double commas -> trailing commas
+  const { result: preFixed, fixes: preFixes } = applyPreFixes(s);
+  if (preFixes.length && preFixed !== s) {
+    result = tryParseOrRepair(preFixed, fixes);
+    if (result && result.ok) return { ...result, fixes: dedup([...fixes, ...(result.fixes || []), ...preFixes]) };
+    const { result: pfRepaired, applied: pfApplied } = smartBracketFix(preFixed);
+    if (pfApplied.length) {
+      result = tryParse(pfRepaired);
+      if (result.ok) return { ...result, fixes: dedup([...fixes, ...preFixes, ...pfApplied]) };
+    }
+    // Also try unquoted keys on preFixed (e.g. after comment removal leaves {name: "x"})
+    const pfUq = preFixed.replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)(\s*:)/g, '$1"$2"$3');
+    if (pfUq !== preFixed) {
+      result = tryParseOrRepair(pfUq, fixes);
+      if (result && result.ok) return { ...result, fixes: dedup([...fixes, ...(result.fixes || []), ...preFixes, 'Quoted unquoted keys']) };
+    }
+  }
+
+  // Stage 3: iterative backslash unescape
   let prev = null, iters = 0, su = s;
   while (prev !== su && iters < 10) {
     prev = su;
@@ -730,12 +1027,18 @@ function deepClean(raw) {
   result = tryParseOrRepair(su, fixes);
   if (result && result.ok) return { ...result, fixes: dedup([...fixes, ...(result.fixes || []), 'Unescaped backslash sequences']) };
 
+  // Stage 4: trailing + double commas
+  const noDouble = s.replace(/,(\s*),/g, ',$1');
+  if (noDouble !== s) {
+    result = tryParseOrRepair(noDouble, fixes);
+    if (result && result.ok) return { ...result, fixes: dedup([...fixes, ...(result.fixes || []), 'Removed duplicate commas']) };
+    s = noDouble; fixes.push('Removed duplicate commas');
+  }
   const noComma = s.replace(/,\s*([}\]])/g, '$1');
   if (noComma !== s) {
     result = tryParseOrRepair(noComma, fixes);
     if (result && result.ok) return { ...result, fixes: dedup([...fixes, ...(result.fixes || []), 'Removed trailing commas']) };
-    s = noComma;
-    fixes.push('Removed trailing commas');
+    s = noComma; fixes.push('Removed trailing commas');
   }
 
   if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
@@ -766,6 +1069,23 @@ function deepClean(raw) {
   return { ok: false, error: result.error, raw: s };
 }
 
+// ─── Indent / Theme toggles ────────────────────────────────
+document.querySelectorAll('#indentGroup .toggle-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#indentGroup .toggle-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentIndent = btn.dataset.val === 'tab' ? '\t' : parseInt(btn.dataset.val);
+    if (cleanedData !== null) renderOutput(cleanedData, []);
+  });
+});
+
+document.querySelectorAll('#themeGroup .toggle-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#themeGroup .toggle-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    if (btn.dataset.theme === 'light') applyLight(); else applyDark();
+  });
+});
 
 // ─── Syntax highlighter ────────────────────────────────────
 function highlight(json) {
