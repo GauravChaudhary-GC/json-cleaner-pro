@@ -422,11 +422,41 @@ Examples of what gets cleaned:
 let currentIndent = 2;
 let cleanedData = null;
 
+// Repairs a JSON-like string where the last string value is missing its closing quote.
+// Pattern: "key": "value} at end of content  ->  "key": "value" }
+// Used by expandStringifiedValues when JSON.parse fails on embedded object strings.
+function fixUnclosedStringBeforeBrace(s) {
+  const applied = [];
+  const fixed = s.replace(/"([^"\\]*(?:\\.[^"\\]*)*)\s*}\s*$/, function(match, content) {
+    applied.push('Closed unclosed string value before }');
+    return '"' + content + '" }';
+  });
+  return { result: fixed, applied };
+}
+
 function expandStringifiedValues(obj) {
   if (typeof obj === 'string') {
     const t = obj.trim();
     if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
       try { return expandStringifiedValues(JSON.parse(t)); } catch(e) {}
+      // Direct parse failed — the string value itself may contain unescaped inner quotes
+      // (e.g. multi-level embedded JSON like "{ "inner": "{ "deep": "value" }" }").
+      // Apply fixEmbeddedJsonStrings to escape them, then retry.
+      const { result: cleaned } = fixEmbeddedJsonStrings(t);
+      if (cleaned !== t) {
+        try { return expandStringifiedValues(JSON.parse(cleaned)); } catch(e) {}
+      }
+      // Last string value may be missing its closing " before the closing brace.
+      // e.g. { "key": "value }  ->  { "key": "value" }
+      const { result: braceFixed } = fixUnclosedStringBeforeBrace(t);
+      if (braceFixed !== t) {
+        try { return expandStringifiedValues(JSON.parse(braceFixed)); } catch(e) {}
+        // Also try combining both fixes (unclosed quotes AND missing close ")
+        const { result: combined } = fixEmbeddedJsonStrings(braceFixed);
+        if (combined !== braceFixed) {
+          try { return expandStringifiedValues(JSON.parse(combined)); } catch(e) {}
+        }
+      }
     }
     if (t.startsWith('{') && /\}\s*\]\s*$/.test(t)) {
       const clean = t.replace(/\}\s*\]\s*$/, '}');
