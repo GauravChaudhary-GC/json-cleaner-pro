@@ -42,22 +42,12 @@
 
 ## Deploy to GitHub Pages
 
-1. Create a **public** GitHub repo named `json-cleaner-pro`
-2. Upload all 4 files to the root of the `main` branch
-3. Go to **Settings → Pages**
-4. Set source to **Deploy from branch → main → / (root)**
-5. Click Save — your site is live in ~60 seconds
+1. Fork or clone this repo
+2. Go to **Settings → Pages**
+3. Set source to **Deploy from branch → main → / (root)**
+4. Your site is live at `https://YOUR_USERNAME.github.io/json-cleaner-pro/`
 
-**After deploy, replace `YOUR_USERNAME`** in `index.html`, `privacy.html`, and this README with your actual GitHub username.
-
-Your URLs:
-```
-https://YOUR_USERNAME.github.io/json-cleaner-pro/          ← Landing page
-https://YOUR_USERNAME.github.io/json-cleaner-pro/app       ← JSON tool
-https://YOUR_USERNAME.github.io/json-cleaner-pro/privacy   ← Privacy policy
-```
-
-> ⚠️ **If you previously deployed an older version**, make sure to **replace all 4 files** — especially `app.html`. GitHub Pages serves whatever is in your repo; uploading only some files will leave the old engine in place for the others.
+Update `YOUR_USERNAME` in `index.html`, `privacy.html`, and this README.
 
 ---
 
