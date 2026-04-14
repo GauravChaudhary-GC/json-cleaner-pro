@@ -340,7 +340,7 @@
 
 <header>
   <div class="logo">JSON Cleaner Pro</div>
-  <div class="logo-tag">v2.7</div>
+  <div class="logo-tag">v2.8</div>
   <a href="index.html" style="font-size:12px;color:var(--muted);text-decoration:none;font-family:'DM Sans',sans-serif;margin-left:8px;transition:color 0.15s" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">&#8592; Home</a>
 
 
@@ -850,18 +850,94 @@ function fixJsValues(s) {
 // Must run before any string-structure analysis.
 // -------------------------------------------------------
 function fixLiteralNewlines(s) {
+  // Line-based approach: detect unclosed string values by structural analysis.
+  // A line starts a multi-line string when it has ": " (value opening) but does NOT
+  // end with a clear structural terminator (closing quote, brace, bracket, or keyword).
+  // This avoids corrupting structural newlines between fields even when a value
+  // contains unescaped inner quotes.
   const applied = [];
-  let result = '', inStr = false, esc = false, changed = false;
-  for (let i = 0; i < s.length; i++) {
-    const c = s[i];
-    if (esc) { esc = false; result += c; continue; }
-    if (c === '\\' && inStr) { esc = true; result += c; continue; }
-    if (c === '"') { inStr = !inStr; result += c; continue; }
-    if (inStr && c === '\n') { result += '\\n'; changed = true; continue; }
-    if (inStr && c === '\r') { result += '\\r'; changed = true; continue; }
-    result += c;
+  const lines = s.split('\n');
+  const out = [];
+  let inMultilineStr = false, changed = false;
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li];
+    if (inMultilineStr) {
+      out[out.length - 1] += '\\n' + line;
+      changed = true;
+      const t = line.trimEnd();
+      if (t.endsWith('"') || t.endsWith('",') || t.endsWith('"}') || t.endsWith('"]')) {
+        inMultilineStr = false;
+      }
+    } else {
+      const t = line.trimEnd();
+      let endsComplete = t.endsWith('"')   || t.endsWith('",')  || t.endsWith('"}')   || t.endsWith('"]')  ||
+                         t.endsWith('},')  || t.endsWith('],')  || t.endsWith('}')    || t.endsWith(']')   ||
+                         t.endsWith('[')   ||
+                         t.endsWith('true,') || t.endsWith('false,') || t.endsWith('null,') ||
+                         t.endsWith('true')  || t.endsWith('false')  || t.endsWith('null');
+      // Also complete when the line ends with a numeric JSON value (not inside a string).
+      // Detect by: last unescaped " on the line is a key-closer (followed by :).
+      if (!endsComplete) {
+        const lastQ = t.lastIndexOf('"');
+        if (lastQ >= 0 && /^:\s*-?\d+\.?\d*[,\s]*$/.test(t.slice(lastQ + 1))) endsComplete = true;
+      }
+      if (/:\s*"/.test(line) && !endsComplete) inMultilineStr = true;
+      out.push(line);
+    }
   }
   if (changed) applied.push('Escaped literal newlines inside strings');
+  return { result: out.join('\n'), applied };
+}
+
+// -------------------------------------------------------
+// fixEmbeddedJsonStrings
+// Finds string values that start with { or [ (embedded JSON objects/arrays)
+// and escapes all unescaped inner quotes within them using brace counting.
+// Handles deeply nested cases like "{ "inner": "{ "deep": "value" }" }".
+// Must run BEFORE fixUnescapedQuotesInValues to handle multi-level nesting.
+// -------------------------------------------------------
+function fixEmbeddedJsonStrings(s) {
+  const applied = [];
+  let result = '', i = 0;
+  while (i < s.length) {
+    // Detect pattern: colon (key-value separator) followed by a string starting with { or [
+    if (s[i] === '"' && i > 0) {
+      let back = i - 1;
+      while (back >= 0 && s[back] === ' ') back--;
+      if (s[back] === ':' && (s[i + 1] === '{' || s[i + 1] === '[')) {
+        const ob = s[i + 1], cb = ob === '{' ? '}' : ']';
+        // Find the real end of the embedded JSON using brace counting
+        let depth = 0, j = i + 1, esc = false;
+        while (j < s.length) {
+          const c = s[j];
+          if (esc) { esc = false; j++; continue; }
+          if (c === '\\') { esc = true; j++; continue; }
+          if (c === ob) depth++;
+          else if (c === cb) { depth--; if (depth === 0) { j++; break; } }
+          j++;
+        }
+        // If the character right after the closing brace is " -> it's the real string closer
+        if (j < s.length && s[j] === '"') {
+          const content = s.slice(i + 1, j);
+          let escaped = '', ei = 0, eesc = false;
+          while (ei < content.length) {
+            const c = content[ei];
+            if (eesc) { escaped += c; eesc = false; ei++; continue; }
+            if (c === '\\') { escaped += c; eesc = true; ei++; continue; }
+            if (c === '"') { escaped += '\\"'; ei++; continue; }
+            escaped += c; ei++;
+          }
+          if (escaped !== content) {
+            applied.push('Escaped inner quotes in embedded JSON string value');
+            result += '"' + escaped + '"';
+            i = j + 1;
+            continue;
+          }
+        }
+      }
+    }
+    result += s[i]; i++;
+  }
   return { result, applied };
 }
 
@@ -903,6 +979,33 @@ function fixBadEscapes(s) {
 }
 
 // -------------------------------------------------------
+// fixTrailingBraceQuote
+// After fixUnescapedQuotesInValues, some values produce a pattern where the
+// quote-fixer correctly identifies the string boundary but a } from embedded
+// JSON content ends up just outside the string closing ".
+// Pattern: <content>[^\\]" }+" -> the " closed the string one char too early,
+// } is part of the content, and the second " is the real string closer.
+// Runs iteratively until stable to handle nested occurrences.
+// -------------------------------------------------------
+function fixTrailingBraceQuote(s) {
+  const applied = [];
+  let result = s, changed = true;
+  while (changed) {
+    changed = false;
+    const next = result.replace(/([^\\])"(\s*\}+\s*)"/g, function(match, pre, braces, offset) {
+      const after = result.slice(offset + match.length).replace(/^\s*/, '')[0];
+      if (!after || after === ',' || after === '\n' || after === '\r' || after === '}' || after === ']') {
+        changed = true;
+        return pre + '\\"' + braces + '"';
+      }
+      return match;
+    });
+    if (next !== result) { applied.push('Fixed trailing brace-quote pattern'); result = next; }
+  }
+  return { result, applied };
+}
+
+// -------------------------------------------------------
 // fixUnquotedValues
 // Wraps bare identifier values in double quotes.
 // Skips JSON/JS keywords that fixJsValues already handles.
@@ -931,14 +1034,16 @@ function applyPreFixes(s) {
     if (applied.length) fixes.push(...applied);
     cur = result;
   }
-  run(fixJsValues);           // comments + JS-only primitives first
-  run(fixLiteralNewlines);    // real newlines inside strings
-  run(fixBadEscapes);         // invalid \X sequences
-  run(fixMissingArrayOpen);   // insert missing { after [ (must run before fixArraysClosedByBrace)
-  run(fixArraysClosedByBrace);// bracket mismatch (} closes [)
-  run(fixWindowsPaths);       // Windows paths must close before quote-escaping
+  run(fixJsValues);                // comments + JS-only primitives first
+  run(fixLiteralNewlines);         // real newlines inside strings (line-based, order-safe)
+  run(fixEmbeddedJsonStrings);     // escape inner quotes in "{ ... }" values before bad-escape pass
+  run(fixWindowsPaths);            // FIX: must run BEFORE fixBadEscapes so \u \j \d in paths are not stripped first
+  run(fixBadEscapes);              // invalid \X sequences (runs after paths are protected)
+  run(fixMissingArrayOpen);        // insert missing { after [ (must run before fixArraysClosedByBrace)
+  run(fixArraysClosedByBrace);     // bracket mismatch (} closes [)
   run(fixUnescapedQuotesInValues); // re-escape inner quotes in values
-  run(fixUnquotedValues);     // bare identifier values
+  run(fixTrailingBraceQuote);      // fix residual }" pattern left by quote-fixer
+  run(fixUnquotedValues);          // bare identifier values
   const noDouble = cur.replace(/,(\s*),/g, ',$1');
   if (noDouble !== cur) { fixes.push('Removed duplicate commas'); cur = noDouble; }
   const noTrail = cur.replace(/,\s*([}\]])/g, '$1');
@@ -1069,7 +1174,6 @@ function deepClean(raw) {
   return { ok: false, error: result.error, raw: s };
 }
 
-// ─── Indent / Theme toggles ────────────────────────────────
 document.querySelectorAll('#indentGroup .toggle-btn').forEach(btn => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('#indentGroup .toggle-btn').forEach(b => b.classList.remove('active'));
